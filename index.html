@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة حديقة المرح - المراحل الثلاث الكاملة مع التلميح والتحليل الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --error: #ef4444;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1050px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            padding: 30px;
+            box-sizing: border-box;
+            text-align: center;
+            position: relative;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes bounceSlow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .mezo-bounce {
+            animation: bounceSlow 2.5s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(79, 70, 229, 0); }
+        }
+
+        .speaking-glow {
+            animation: pulseGlow 1.5s infinite;
+        }
+
+        @keyframes adaptiveGlow {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8), 0 0 15px rgba(16, 185, 129, 0.6); border-color: #10b981; }
+            50% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0), 0 0 25px rgba(16, 185, 129, 0.9); border-color: #34d399; }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8), 0 0 15px rgba(16, 185, 129, 0.6); border-color: #10b981; }
+        }
+
+        .adaptive-hint-glow {
+            animation: adaptiveGlow 1.2s infinite ease-in-out;
+            border-width: 4px !important;
+            transform: scale(1.02);
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+<!-- تعريف شكل ميزو الأصلي بدقة SVG -->
+<svg style="display:none;">
+    <g id="mezo-svg-icon">
+        <path d="M 25 45 Q 25 15 50 15 Q 75 15 75 45 Q 75 55 65 60 Q 50 65 35 60 Q 25 55 25 45 Z" fill="#b2bec3" />
+        <path d="M 32 30 Q 32 22 50 22 Q 68 22 68 30 Q 68 50 50 50 Q 32 50 32 30 Z" fill="#2d3436" />
+        <circle cx="42" cy="35" r="5" fill="#81ecec" />
+        <circle cx="58" cy="35" r="5" fill="#81ecec" />
+        <path d="M 45 42 Q 50 47 55 42 Z" fill="#ffffff" />
+        <path d="M 35 65 Q 35 58 50 58 Q 65 58 65 65 L 70 85 Q 70 90 50 90 Q 30 90 30 85 Z" fill="#b2bec3" />
+        <circle cx="50" cy="72" r="3" fill="#636e72" />
+    </g>
+</svg>
+
+<div class="absolute top-5 left-5 flex gap-2 z-10">
+    <button class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition" onclick="openAiChatModal()">🤖 دردشة ذكية مع ميزو</button>
+    <button id="sound-toggle-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-3 rounded-xl shadow-sm transition" onclick="toggleSound()">🔊 الصوت: مفعل</button>
+</div>
+
+<div class="container" id="printable-report-area">
+    <!-- شاشة الترحيب -->
+    <div id="welcome-screen" class="screen active">
+        <div class="mb-6">
+            <div id="welcome-avatar" class="w-32 h-32 mx-auto mb-3 mezo-bounce cursor-pointer flex items-center justify-center" onclick="greetWelcome()" title="انقر لسماع التحية">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-md">
+                    <use href="#mezo-svg-icon" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-indigo-600 mb-2">لعبة حديقة المرح - المراحل الثلاث</h1>
+            <p class="text-slate-500">رحلة تفاعلية لتنمية المرونة وتحليل التشتت والتركيز البصري بدقة ذكية!</p>
+        </div>
+        <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl mb-6 max-w-md mx-auto">
+            <label class="block text-slate-700 font-bold mb-2">الرجاء إدخال اسم البطل للبدء:</label>
+            <input type="text" id="child-name" class="w-full px-4 py-3 text-lg border-2 border-slate-300 rounded-xl text-center focus:border-indigo-600 focus:outline-none transition mb-4" placeholder="اكتب اسم الطفل هنا..." autocomplete="off">
+            <button onclick="startApp()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition transform active:scale-95">ابدأ المغامرة الآن 🚀</button>
+        </div>
+    </div>
+
+    <!-- شاشة اللعبة -->
+    <div id="game-screen" class="screen">
+        <div class="flex justify-between items-center mb-4 font-bold text-slate-500">
+            <span id="player-display" class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg"></span>
+            <span id="stage-badge" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-lg text-xs">المرحلة</span>
+            <span id="question-counter" class="bg-slate-100 px-3 py-1 rounded-lg">السؤال 1 من 12</span>
+        </div>
+
+        <!-- شريط ميزو العلوي بالشكل الأصلي -->
+        <div class="flex items-center justify-between bg-sky-50 border-2 border-dashed border-sky-300 rounded-2xl p-3 mb-6 shadow-sm">
+            <div class="flex items-center gap-3 text-right flex-1">
+                <div id="mezo-avatar" class="w-12 h-12 flex-shrink-0 cursor-pointer mezo-bounce flex items-center justify-center bg-white rounded-full shadow p-1" onclick="repeatMezoSpeech()" title="انقر لإعادة الاستماع">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+                        <use href="#mezo-svg-icon" />
+                    </svg>
+                </div>
+                <div class="text-sky-900 font-bold text-sm sm:text-base" id="mezo-speech">مرحباً يا بطل!</div>
+            </div>
+            <button onclick="repeatMezoSpeech()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold py-2 px-4 rounded-xl shadow transition flex items-center gap-1">
+                🔊 إعادة الصوت
+            </button>
+        </div>
+
+        <!-- عنوان السؤال بخط كبير -->
+        <div class="text-xl sm:text-2xl font-bold text-slate-900 mb-6" id="question-title"></div>
+
+        <!-- حاوية الصورة الرئيسية (إذا وجدت) -->
+        <div class="mx-auto my-3 max-w-sm h-48 rounded-2xl overflow-hidden shadow-md bg-slate-50 flex items-center justify-center border-2 border-indigo-100 hidden" id="target-container"></div>
+
+        <!-- خيارات الصور الكبيرة والكاملة -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6" id="options-grid"></div>
+
+        <div class="font-bold text-lg min-h-[30px]" id="feedback-banner"></div>
+    </div>
+
+    <!-- شاشة التقرير -->
+    <div id="report-screen" class="screen text-right">
+        <div class="flex items-center justify-center gap-2 mb-2">
+            <span class="text-3xl">🏆</span>
+            <h1 class="text-2xl sm:text-3xl font-bold text-sky-600" id="rep-main-title">تقرير حديقة المرح</h1>
+        </div>
+        <p class="text-slate-500 mb-6 text-center text-xs sm:text-sm">تحليل التركيز البصري، عدد الأخطاء، ومؤشر التشتت للمراحل الثلاث</p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-white border-2 border-amber-300 p-3 rounded-2xl text-center shadow-sm">
+                <span class="text-amber-700 text-xs font-bold block mb-1">النقاط الإجمالية</span>
+                <strong id="rep-score" class="text-2xl text-amber-600 font-bold">0</strong>
+            </div>
+            <div class="bg-white border-2 border-emerald-300 p-3 rounded-2xl text-center shadow-sm">
+                <span class="text-emerald-700 text-xs font-bold block mb-1">نسبة النجاح</span>
+                <strong id="rep-success-rate" class="text-xl text-emerald-600 font-bold">0%</strong>
+            </div>
+            <div class="bg-white border-2 border-sky-300 p-3 rounded-2xl text-center shadow-sm">
+                <span class="text-sky-700 text-xs font-bold block mb-1">متوسط زمن الاستجابة</span>
+                <strong id="rep-avg-latency" class="text-xl text-sky-600 font-bold">0 ثانية</strong>
+            </div>
+            <div class="bg-white border-2 border-indigo-300 p-3 rounded-2xl text-center shadow-sm">
+                <span class="text-indigo-700 text-xs font-bold block mb-1">مؤشر المرونة والتشتت</span>
+                <strong id="rep-flexibility" class="text-lg text-indigo-600 font-bold">متطورة</strong>
+            </div>
+        </div>
+
+        <div class="bg-indigo-50/70 border-2 border-indigo-200 p-5 rounded-2xl mb-6 shadow-sm space-y-4 text-right">
+            <div>
+                <h4 class="font-bold text-indigo-950 text-sm flex items-center gap-1"><span>⭐</span> 1. تقييم أداء البطل الاستراتيجي والمعرفي</h4>
+                <p id="eval-part-1" class="text-xs sm:text-sm text-slate-700 mt-1"></p>
+            </div>
+            <div>
+                <h4 class="font-bold text-indigo-950 text-sm flex items-center gap-1"><span>💡</span> 2. تحليل التركيز البصري ومستويات التشتت</h4>
+                <p id="eval-part-2" class="text-xs sm:text-sm text-slate-700 mt-1">يُظهر تتبع زمن التردد وعدد أخطاء المحاولات استقرار التركيز البصري؛ حيث تم رصد ومواجهة فترات التشتت عبر التلميح الذكي المضيء.</p>
+            </div>
+            <div>
+                <h4 class="font-bold text-indigo-950 text-sm flex items-center gap-1"><span>🎯</span> 3. التوصيات التربوية وتطوير الانتباه</h4>
+                <p id="eval-part-3" class="text-xs sm:text-sm text-slate-700 mt-1">الاستمرار في الأنشطة البصرية لتقليل معدل الأخطاء وزمن الاستجابة في مواقف الاختيار السريع وتعزيز اليقظة الانتباهية.</p>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-2xl p-2 mb-6 overflow-x-auto shadow-sm">
+            <table class="w-full text-right text-xs sm:text-sm border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                        <th class="p-3">المرحلة والموقف</th>
+                        <th class="p-3">زمن الاستجابة البصرية</th>
+                        <th class="p-3">عدد مرات الخطأ</th>
+                        <th class="p-3">حالة التشتت والتركيز</th>
+                        <th class="p-3">حالة التلميح الذكي</th>
+                    </tr>
+                </thead>
+                <tbody id="report-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+
+        <div class="flex flex-wrap gap-3 justify-center">
+            <button onclick="downloadReportAsImage()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-5 rounded-xl shadow-lg transition">📸 تصدير كصورة</button>
+            <button onclick="downloadReportAsExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl shadow-lg transition">📊 تحميل Excel</button>
+            <button onclick="location.reload()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-5 rounded-xl shadow-lg transition">🔄 إعادة اللعبة</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الدردشة الذكية -->
+<div id="ai-chat-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[500px]">
+        <div class="bg-indigo-600 text-white p-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg">الدردشة الذكية مع ميزو</h3>
+            <button onclick="closeAiChatModal()" class="text-white font-bold text-lg">✕</button>
+        </div>
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 text-right text-sm">
+            <div class="bg-indigo-100 text-indigo-900 p-3 rounded-2xl">مرحباً! كيف يمكنني مساعدتك في حديقة المرح اليوم؟</div>
+        </div>
+        <div class="p-3 bg-white border-t border-slate-200 flex gap-2">
+            <input type="text" id="chat-input" class="flex-1 px-4 py-2 border rounded-xl text-sm" placeholder="اكتب سؤالك..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+            <button onclick="sendChatMessage()" class="bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold">إرسال</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const IMGS = {
+        lion: "Gemini_Generated_Image_gyfzxtgyfzxtgyfz.jpg",
+        lionShadow: "Gemini_Generated_Image_hfo0ruhfo0ruhfo0.jpg",
+        giraffeShadow: "Gemini_Generated_Image_6miuh96miuh96miu.jpg",
+        elephantShadow: "Gemini_Generated_Image_f1x7yof1x7yof1x7.jpg",
+        
+        grapes: "Gemini_Generated_Image_aiztc4aiztc4aizt.jpg",
+        grapesShadow: "Gemini_Generated_Image_hqmgcdhqmgcdhqmg.jpg",
+        bananaShadow: "Gemini_Generated_Image_4p2zq44p2zq44p2z.jpg",
+        plumShadow: "Gemini_Generated_Image_b6s2sb6s2sb6s2sb.jpg",
+
+        cucumber: "Gemini_Generated_Image_gliddfgliddfglid.jpg",
+        cucumberShadow: "Gemini_Generated_Image_jvlffzjvlffzjvlf.jpg",
+        carrotShadow: "Gemini_Generated_Image_39fj7t39fj7t39fj.jpg",
+        tomatoShadow: "Gemini_Generated_Image_o2g30po2g30po2g3.jpg",
+
+        cryingChild: "Gemini_Generated_Image_gcge5rgcge5rgcge.jpg",
+        lonelyChild: "Gemini_Generated_Image_ysipqdysipqdysip.jpg",
+        playingChild: "Gemini_Generated_Image_9o1mq39o1mq39o1m.jpg"
+    };
+
+    // المرحلة الأولى
+    const stage1Questions = [
+        {
+            stageName: "المرحلة الأولى",
+            title: "السؤال الأول: اختر الظل المناسب لصورة الأسد",
+            topic: "مطابقة ظل الأسد",
+            difficulty: "سهل",
+            hint: "انظر جيداً لشكل الأذن والجسد في الخيار الذي اخترته، هل يتطابق حقاً مع تفاصيل الأسد؟",
+            targetImg: IMGS.lion,
+            options: [
+                { text: "ظل الأسد", img: IMGS.lionShadow, correct: true },
+                { text: "ظل الزرافة", img: IMGS.giraffeShadow, correct: false },
+                { text: "ظل الفيل", img: IMGS.elephantShadow, correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الأولى",
+            title: "السؤال الثاني: اختر الظل المناسب لصورة العنب",
+            topic: "مطابقة ظل العنب",
+            difficulty: "متوسط",
+            hint: "تأمل شكل الحبات والتراص في الخيار؛ هل يبدو كعناقيد دائرية متراصة أم شيئاً آخر؟",
+            targetImg: IMGS.grapes,
+            options: [
+                { text: "ظل الموز", img: IMGS.bananaShadow, correct: false },
+                { text: "ظل البرقوق", img: IMGS.plumShadow, correct: false },
+                { text: "ظل العنب", img: IMGS.grapesShadow, correct: true }
+            ]
+        },
+        {
+            stageName: "المرحلة الأولى",
+            title: "السؤال الثالث: اختر الظل المناسب لصورة الخيار",
+            topic: "مطابقة ظل الخيار",
+            difficulty: "متوسط",
+            hint: "تدقق في طول وحجم الشكل المختار؛ الخيار يتميز بطوله واستدارته مقارنة بالأشكال الأخرى.",
+            targetImg: IMGS.cucumber,
+            options: [
+                { text: "ظل الجزر", img: IMGS.carrotShadow, correct: false },
+                { text: "ظل الخيار", img: IMGS.cucumberShadow, correct: true },
+                { text: "ظل الطماطم", img: IMGS.tomatoShadow, correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الأولى",
+            title: "السؤال الرابع: طفل رفض أصدقاؤه اللعب معه، ماذا يفعل؟",
+            topic: "تجاوز الرفض الاجتماعي",
+            difficulty: "متوسط",
+            hint: "البقاء وحيداً وعزل النفس يزيد الشعور بالحزن ولا يحل المشكلة، فكر في تصرف إيجابي ومريح أكثر.",
+            targetImg: IMGS.cryingChild,
+            options: [
+                { text: "البقاء وحيداً حزيناً", img: IMGS.lonelyChild, correct: false },
+                { text: "اللعب مع أصدقاء آخرين بسعادة", img: IMGS.playingChild, correct: true }
+            ]
+        }
+    ];
+
+    // المرحلة الثانية
+    const stage2Questions = [
+        {
+            stageName: "المرحلة الثانية",
+            title: "السؤال الأول: ما السلوك المناسب للدخول إلى الحدائق العامة؟",
+            topic: "الدخول للحديقة",
+            hint: "القفز فوق السور أو التخريب يعرضنا للخطر ويزعج الآخرين، فهل هذا تصرف سليم؟",
+            options: [
+                { text: "الدخول بتذكرة وبنظام", img: "q1_opt1.png.jpg", correct: true },
+                { text: "القفز فوق السور", img: "q1_opt2.png.jpg", correct: false },
+                { text: "الجري العشوائي المزعج", img: "q1_opt3.png.jpg", correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الثانية",
+            title: "السؤال الثاني: ماذا يتوجب عليك فعله بالقمامة في الحديقة؟",
+            topic: "التعامل مع القمامة",
+            hint: "ترك المخلفات على العشب يلوث البيئة وتشوه جمال الحديقة المؤذي للطبيعة.",
+            options: [
+                { text: "رميها في سلة المهملات المخصصة", img: "q2_opt1.png.jpg", correct: true },
+                { text: "تركها على العشب الأخضر", img: "q2_opt2.png.jpg", correct: false },
+                { text: "إلقاؤها في بحيرة الحديقة", img: "q2_opt3.png.jpg", correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الثانية",
+            title: "السؤال الثالث: ما المكان المخصص للجلوس في الحديقة؟",
+            topic: "مكان الجلوس",
+            hint: "الجلوس فوق أحواض الزهور يتسبب في كسرها وتخريبها، ابحث عن المكان المخصص للراحة.",
+            options: [
+                { text: "الجلوس فوق أحواض الزهور", img: "q3_opt1.png.jpg", correct: false },
+                { text: "الجلوس على المقاعد المخصصة", img: "q3_opt2.png.jpg", correct: true },
+                { text: "الجلوس في ممر الدراجات", img: "q3_opt3.png.jpg", correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الثانية",
+            title: "السؤال الرابع: ما السلوك المناسب للتفاعل مع الزهور؟",
+            topic: "التفاعل مع الزهور",
+            hint: "قطف الزهور وتخريبها يحرمنا والآخرين من استنشاق جمالها الطبيعي، فكر في أثر ذلك.",
+            options: [
+                { text: "قطف جميع الزهور وتخريبها", img: "q4_opt1.png.jpg", correct: false },
+                { text: "دوس الزهور بالأقدام", img: "q4_opt2.png.jpg", correct: false },
+                { text: "الاستمتاع بمنظرها الجميل دون قطفها", img: "q4_opt3.png.jpg", correct: true }
+            ]
+        },
+        {
+            stageName: "المرحلة الثانية",
+            title: "السؤال الخامس: ما السلوك المناسب للتفاعل مع الأشجار؟",
+            topic: "التفاعل مع الأشجار",
+            hint: "كسر الأغصان يؤذي الشجرة الحية ويمنعها من إعطائنا الظل الجميل، هل هذا سلوك صحيح؟",
+            options: [
+                { text: "كسر أغصان الشجرة للعب بها", img: "q5_opt1.png.jpg", correct: false },
+                { text: "حماية الشجرة وتأمل جمالها بهدوء", img: "q5_opt2.png.jpg", correct: true },
+                { text: "تسلقها بطريقة خطرة وعشوائية", img: "q5_opt3.png.jpg", correct: false }
+            ]
+        }
+    ];
+
+    // المرحلة الثالثة
+    const stage3Questions = [
+        {
+            stageName: "المرحلة الثالثة",
+            title: "السؤال الأول: بما سيشعر سليم عندما رفض فهد وسارة اللعب معه؟",
+            topic: "مشاعر الاستغراب",
+            difficulty: "سهل",
+            hint: "انظر إلى يده كيف يضعها على رأسه بحيرة واستغراب!",
+            options: [
+                { text: "يشعر بالحيرة والاستغراب", img: "q1_opt1.png (2).jpg", correct: true },
+                { text: "غاضب", img: "q1_opt2.png (2).jpg", correct: false },
+                { text: "سعيد", img: "q1_opt3.png (2).jpg", correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الثالثة",
+            title: "السؤال الثاني: كيف سيسلك سليم عندما رفض فهد وسارة اللعب معه؟",
+            topic: "السلوك الهادئ والتركيز",
+            difficulty: "متوسط",
+            hint: "تذكر كيف يجلس بهدوء ويمسك الأوراق بتركيز.",
+            options: [
+                { text: "يُمسك بأوراق كوتشينه", img: "q2_opt1.png (2).jpg", correct: true },
+                { text: "يضرب بنت", img: "q2_opt2.png (2).jpg", correct: false },
+                { text: "يخطف الاوراق", img: "q2_opt3.png (2).jpg", correct: false }
+            ]
+        },
+        {
+            stageName: "المرحلة الثالثة",
+            title: "السؤال الثالث: ما رد فعل سليم تجاه فهد وسارة عندما قررا تغيير اللعبة؟",
+            topic: "المرونة واللعب الجماعي",
+            difficulty: "متقدم",
+            hint: "انظر كيف يشاركهم بحماس وسرور في لعبة الكرة!",
+            options: [
+                { text: "يلعب كرة القدم مع زملائه", img: "q3_opt1.png (2).jpg", correct: true },
+                { text: "يضرب بنت", img: "q3_opt2.png (2).jpg", correct: false },
+                { text: "يقف بعيدًا", img: "q3_opt3.png (2).jpg", correct: false }
+            ]
+        }
+    ];
+
+    let allQuestions = [...stage1Questions, ...stage2Questions, ...stage3Questions];
+    let currentStep = 0;
+    let childName = "";
+    let questionStartTime = 0;
+    let correctCount = 0;
+    let errorCount = 0;
+    let questionMetrics = {};
+    let soundEnabled = true;
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        btn.innerText = soundEnabled ? "🔊 الصوت: مفعل" : "🔇 الصوت: مكتوم";
+        if (!soundEnabled) window.speechSynthesis.cancel();
+    }
+
+    function speakText(text) {
+        if (!soundEnabled) return;
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ar-SA';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+
+        const avatars = document.querySelectorAll('#mezo-avatar, #welcome-avatar');
+        utterance.onstart = () => avatars.forEach(av => av.classList.add('speaking-glow'));
+        utterance.onend = () => avatars.forEach(av => av.classList.remove('speaking-glow'));
+        utterance.onerror = () => avatars.forEach(av => av.classList.remove('speaking-glow'));
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function repeatMezoSpeech() {
+        const q = allQuestions[currentStep];
+        if (q) speakText(q.title);
+    }
+
+    function greetWelcome() {
+        speakText("أهلاً بك في لعبة حديقة المرح بنسختها الكاملة مع تحليل التشتت، التركيز، وعدد الأخطاء!");
+    }
+
+    function openAiChatModal() { document.getElementById('ai-chat-modal').classList.remove('hidden'); }
+    function closeAiChatModal() { document.getElementById('ai-chat-modal').classList.add('hidden'); }
+
+    function startApp() {
+        const input = document.getElementById('child-name');
+        childName = input.value.trim();
+        if (!childName) {
+            alert("الرجاء كتابة اسم البطل أولاً!");
+            return;
+        }
+
+        currentStep = 0;
+        correctCount = 0;
+        errorCount = 0;
+        questionMetrics = {};
+
+        document.getElementById('welcome-screen').classList.remove('active');
+        document.getElementById('game-screen').classList.add('active');
+        document.getElementById('player-display').innerText = `البطل: ${childName}`;
+
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        if (currentStep >= allQuestions.length) {
+            showReport();
+            return;
+        }
+
+        const q = allQuestions[currentStep];
+        questionStartTime = new Date();
+
+        if (!questionMetrics[currentStep]) {
+            questionMetrics[currentStep] = { 
+                attempts: 0, 
+                failedAttempts: 0, 
+                title: q.title, 
+                topic: q.topic || `السؤال ${currentStep + 1}`,
+                stageName: q.stageName,
+                latency: 0,
+                hintTriggered: false,
+                failed: false 
+            };
+        }
+
+        document.getElementById('question-counter').innerText = `السؤال ${currentStep + 1} من ${allQuestions.length}`;
+        document.getElementById('stage-badge').innerText = q.stageName;
+        document.getElementById('question-title').innerText = q.title;
+        document.getElementById('feedback-banner').innerText = "";
+        document.getElementById('mezo-speech').innerText = q.title;
+
+        const targetContainer = document.getElementById('target-container');
+        targetContainer.innerHTML = "";
+        if (q.targetImg) {
+            targetContainer.classList.remove('hidden');
+            const img = document.createElement('img');
+            img.src = q.targetImg;
+            img.className = "max-w-full max-h-full object-contain p-1";
+            targetContainer.appendChild(img);
+        } else {
+            targetContainer.classList.add('hidden');
+        }
+
+        renderOptions(q);
+        speakText(q.title);
+    }
+
+    function renderOptions(q) {
+        const optionsGrid = document.getElementById('options-grid');
+        optionsGrid.innerHTML = "";
+
+        q.options.forEach((opt, index) => {
+            const card = document.createElement('div');
+            card.className = `option-card-${index} bg-white border-2 border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-indigo-600 hover:-translate-y-1 transition flex flex-col items-center justify-between shadow-sm min-h-[280px]`;
+            card.onclick = () => handleAnswer(index);
+
+            let contentHTML = "";
+            if (opt.img) {
+                contentHTML += `<div class="w-full h-44 mb-3 flex items-center justify-center bg-slate-50 rounded-xl overflow-hidden p-1 border border-slate-100">`;
+                contentHTML += `<img src="${opt.img}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://placehold.co/300x200/f1f5f9/4f46e5?text=صورة'">`;
+                contentHTML += `</div>`;
+            }
+            contentHTML += `<span class="text-sm font-bold text-slate-800 text-center">${opt.text}</span>`;
+            card.innerHTML = contentHTML;
+            optionsGrid.appendChild(card);
+        });
+    }
+
+    function handleAnswer(selectedIndex) {
+        const q = allQuestions[currentStep];
+        const now = new Date();
+        const latencySec = ((now - questionStartTime) / 1000).toFixed(2);
+        
+        if (!questionMetrics[currentStep].latency || questionMetrics[currentStep].latency == 0) {
+            questionMetrics[currentStep].latency = latencySec;
+        }
+
+        questionMetrics[currentStep].attempts++;
+
+        const banner = document.getElementById('feedback-banner');
+        const isCorrect = q.options[selectedIndex].correct;
+
+        if (isCorrect) {
+            correctCount++;
+            banner.className = "font-bold text-lg text-emerald-600 min-h-[30px]";
+            banner.innerText = `أبدعت يا ${childName}! إجابة صحيحة ورائعة جداً!`;
+            document.getElementById('mezo-speech').innerText = banner.innerText;
+            speakText(banner.innerText);
+            
+            setTimeout(() => {
+                currentStep++;
+                loadQuestion();
+            }, 1200);
+        } else {
+            errorCount++;
+            questionMetrics[currentStep].failed = true;
+            questionMetrics[currentStep].failedAttempts++;
+            
+            if (questionMetrics[currentStep].failedAttempts >= 1) {
+                questionMetrics[currentStep].hintTriggered = true;
+                q.options.forEach((opt, idx) => {
+                    if (opt.correct) {
+                        const correctCard = document.querySelector(`.option-card-${idx}`);
+                        if (correctCard) {
+                            correctCard.classList.add('adaptive-hint-glow');
+                        }
+                    }
+                });
+            }
+
+            banner.className = "font-bold text-lg text-rose-500 min-h-[30px]";
+            banner.innerText = `محاولة للتفكير: ${q.hint || "ركز قليلاً يا بطل وجرب الإطار المضيء!"}`;
+            document.getElementById('mezo-speech').innerText = banner.innerText;
+            speakText(q.hint || "ركز قليلاً يا بطل وجرب الإطار المضيء!");
+        }
+    }
+
+    function downloadReportAsImage() {
+        const area = document.getElementById('printable-report-area');
+        html2canvas(area, { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `تقرير_حديقة_المرح_${childName}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+
+    function downloadReportAsExcel() {
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "المرحلة والموقف,زمن الاستجابة البصرية,عدد مرات الخطأ,حالة التشتت والتركيز,حالة التلميح الذكي\n";
+
+        for (let step in questionMetrics) {
+            const m = questionMetrics[step];
+            const latVal = parseFloat(m.latency || 4.0);
+            let distractionStatus = "تركيز بصري ممتاز ✓";
+            if (m.failedAttempts > 1 || latVal > 7.0) {
+                distractionStatus = "تشتت ملحوظ (تردد عالٍ)";
+            } else if (m.failedAttempts === 1 || latVal > 4.5) {
+                distractionStatus = "تشتت طفيف مؤقت";
+            }
+            const hintStatus = m.hintTriggered ? "تفعيل الإطار المضيء التكيفي" : "إجابة تلقائية مباشرة";
+            const row = [`"${m.stageName} - ${m.topic}"`, `"${latVal} ثانية"`, `"${m.failedAttempts} أخطاء"`, `"${distractionStatus}"`, `"${hintStatus}"`];
+            csvContent += row.join(",") + "\n";
+        }
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `تقرير_حديقة_المرح_${childName}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function showReport() {
+        document.getElementById('game-screen').classList.remove('active');
+        document.getElementById('report-screen').classList.add('active');
+
+        document.getElementById('rep-main-title').innerText = `تقرير حديقة المرح (${childName})`;
+        
+        const successRateVal = Math.round((correctCount / (correctCount + errorCount)) * 100) || 75;
+        const totalScore = Math.max(50, 300 - (errorCount * 10));
+        
+        let totalLat = 0, countLat = 0;
+        for (let s in questionMetrics) {
+            if (questionMetrics[s].latency) {
+                totalLat += parseFloat(questionMetrics[s].latency);
+                countLat++;
+            }
+        }
+        const avgLat = countLat > 0 ? (totalLat / countLat).toFixed(1) : "4.2";
+
+        let flexibilityLabel = "ممتازة ومتطورة";
+        let flexibilityScoreColor = "text-emerald-600";
+        if (errorCount > 5) {
+            flexibilityLabel = "تشتت عالي وتتطلب متابعة";
+            flexibilityScoreColor = "text-amber-600";
+        } else if (errorCount > 2) {
+            flexibilityLabel = "جيدة مع تشتت بصري خفيف";
+            flexibilityScoreColor = "text-sky-600";
+        }
+
+        document.getElementById('rep-score').innerText = totalScore;
+        document.getElementById('rep-success-rate').innerText = `${successRateVal}%`;
+        document.getElementById('rep-avg-latency').innerText = `${avgLat} ثانية`;
+        
+        const flexEl = document.getElementById('rep-flexibility');
+        flexEl.innerText = flexibilityLabel;
+        flexEl.className = `text-lg font-bold ${flexibilityScoreColor}`;
+
+        document.getElementById('eval-part-1').innerText = `أظهر البطل ${childName} أداءً متميزاً بنسبة نجاح بلغت ${successRateVal}%. تم تحليل أوقات الاستجابة البصرية وعدد الأخطاء بمتوسط زمن بلغ ${avgLat} ثانية لتحديد مستويات الانتباه والتشتت بدقة.`;
+
+        const tableBody = document.getElementById('report-table-body');
+        tableBody.innerHTML = "";
+
+        for (let step in questionMetrics) {
+            const m = questionMetrics[step];
+            const latVal = parseFloat(m.latency || 4.0);
+            
+            let distractionText = "تركيز بصري عالي ✓";
+            let statusClass = "text-emerald-600 font-bold";
+            
+            if (m.failedAttempts > 1 || latVal > 7.0) {
+                distractionText = "تشتت ملحوظ وتردد عالي ⚠️";
+                statusClass = "text-rose-600 font-semibold";
+            } else if (m.failedAttempts === 1 || latVal > 4.5) {
+                distractionText = "تشتت بصري طفيف مؤقت ⚡";
+                statusClass = "text-amber-600 font-semibold";
+            }
+
+            const hintStatus = m.hintTriggered ? "تفعيل الإطار المضيء التكيفي" : "استجابة تلقائية مباشرة";
+
+            const tr = document.createElement('tr');
+            tr.className = "border-b border-slate-100 hover:bg-slate-50 transition";
+            tr.innerHTML = `
+                <td class="p-3 font-bold text-slate-700">${m.stageName} - ${m.topic}</td>
+                <td class="p-3 text-slate-600">${latVal} ثانية</td>
+                <td class="p-3 font-bold text-rose-600">${m.failedAttempts} مرات</td>
+                <td class="p-3 ${statusClass}">${distractionText}</td>
+                <td class="p-3 text-indigo-700 font-medium">${hintStatus}</td>
+            `;
+            tableBody.appendChild(tr);
+        }
+
+        speakText(`تهانينا يا ${childName}! لقد أتممت جميع مراحل حديقة المرح بنجاح.`);
+    }
+
+    function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const chatMessages = document.getElementById('chat-messages');
+        const userBubble = document.createElement('div');
+        userBubble.className = "bg-indigo-600 text-white p-3 rounded-2xl rounded-tl-none max-w-[80%] mr-auto";
+        userBubble.innerText = text;
+        chatMessages.appendChild(userBubble);
+        input.value = "";
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        setTimeout(() => {
+            const mezoBubble = document.createElement('div');
+            mezoBubble.className = "bg-indigo-100 text-indigo-900 p-3 rounded-2xl rounded-tr-none max-w-[80%] ml-auto";
+            mezoBubble.innerText = "أنا هنا دائماً لمساعدتك في قياس وتطوير مهارات التركيز والانتباه يا بطل!";
+            chatMessages.appendChild(mezoBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            speakText("أنا هنا دائما لمساعدتك يا بطل");
+        }, 800);
+    }
+</script>
+
+</body>
+</html>
